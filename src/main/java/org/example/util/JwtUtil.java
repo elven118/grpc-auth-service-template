@@ -1,14 +1,11 @@
 package org.example.util;
 
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import org.example.entity.User;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 @Component
 public class JwtUtil {
@@ -17,48 +14,33 @@ public class JwtUtil {
     private String jwtSecret;
 
     public String generateToken(User user) {
-        Map<String, Object> claims = new HashMap<>();
+        Claims claims = Jwts.claims();
+        claims.put("id", user.getId().toString());
         return Jwts.builder()
-                .setClaims(claims)
-                .setId(user.getId().toString())
-                .setSubject(user.getEmail())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + 86400000))
-                .signWith(SignatureAlgorithm.HS512, jwtSecret)
-                .compact();
+                   .setClaims(claims)
+                   .setIssuedAt(new Date())
+                   .setExpiration(new Date(System.currentTimeMillis() + 86400000))
+                   .signWith(SignatureAlgorithm.HS256, jwtSecret)
+                   .compact();
     }
 
-    public String getIdFromToken(String token) {
-        return Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody()
-                .getId();
+    public String getId(String token) {
+        return Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token).getBody().get("id", String.class);
     }
 
-    public String getEmailFromToken(String token) {
-        return Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
-    }
-
-    private Date getExpirationDateFromToken(String token) {
-        return Jwts.parser()
-                .setSigningKey(jwtSecret)
-                .parseClaimsJws(token)
-                .getBody()
-                .getExpiration();
-    }
-
-    private boolean isTokenExpired(String token) {
-        final Date expiration = getExpirationDateFromToken(token);
-        return expiration.before(new Date());
-    }
-
-    public boolean validateToken(String token, User user) {
-        final String userId = getIdFromToken(token);
-        return user.getId().toString().equals(userId) && !isTokenExpired(token);
+    public boolean validateToken(String token) {
+        try {
+            Jwts.parser().setSigningKey(jwtSecret).parseClaimsJws(token);
+            return true;
+        } catch (SignatureException e) {
+            System.out.println("Invalid signature");
+            return false;
+        } catch (ExpiredJwtException e) {
+            System.out.println("Token expired");
+            return false;
+        } catch (Exception e) {
+            System.out.println("Error: " + e);
+            return false;
+        }
     }
 }
